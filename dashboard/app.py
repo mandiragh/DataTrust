@@ -56,7 +56,7 @@ except Exception as error:
     st.exception(error)
     st.stop()
 
-# Ensure consistent ordering regardless of data source
+
 df = df.sort_values("result_id", ascending=False)
 
 # Dataset selector
