@@ -13,44 +13,51 @@ st.set_page_config(
 st.title("DataTrust Monitor")
 st.caption("Data Quality & Reliability Monitoring")
 
-# Connect to PostgreSQL and load validation results
+
+from pathlib import Path
+
+# Load data from PostgreSQL locally or CSV on Streamlit Cloud
+csv_path = Path(__file__).parent / "data" / "data_quality_results.csv"
+
 try:
-    with psycopg.connect(
-        host="localhost",
-        port=5432,
-        dbname="datatrust_db",
-        user=os.getenv("PGUSER", os.getenv("USER")),
-        connect_timeout=5,
-    ) as conn:
+    if os.getenv("DATATRUST_DATA_SOURCE") == "csv":
+        # Streamlit Cloud: use exported validation results
+        df = pd.read_csv(csv_path)
 
-        # Fetch records WHILE the cursor is open
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT
-                    result_id,
-                    run_id,
-                    dataset_name,
-                    check_name,
-                    issue_count,
-                    status,
-                    checked_at
-                FROM data_quality_results
-                ORDER BY result_id DESC
-            """)
+        df["checked_at"] = pd.to_datetime(
+            df["checked_at"], utc=True
+        )
 
-            records = cursor.fetchall()
-            columns = [col.name for col in cursor.description]
+    else:
+        # Local development: connect to PostgreSQL
+        with psycopg.connect(
+            host="localhost",
+            port=5432,
+            dbname="datatrust_db",
+            user=os.getenv("PGUSER", os.getenv("USER")),
+            connect_timeout=5,
+        ) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        result_id, run_id, dataset_name,
+                        check_name, issue_count, status, checked_at
+                    FROM data_quality_results
+                    ORDER BY result_id DESC
+                """)
 
-    df = pd.DataFrame(records, columns=columns)
+                records = cursor.fetchall()
+                columns = [col.name for col in cursor.description]
+
+        df = pd.DataFrame(records, columns=columns)
 
 except Exception as error:
-    st.error("Unable to load PostgreSQL results.")
+    st.error("Unable to load DataTrust validation results.")
     st.exception(error)
     st.stop()
 
-if df.empty:
-    st.warning("No validation results found.")
-    st.stop()
+# Ensure consistent ordering regardless of data source
+df = df.sort_values("result_id", ascending=False)
 
 # Dataset selector
 datasets = df["dataset_name"].dropna().unique().tolist()
