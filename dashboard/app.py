@@ -20,7 +20,7 @@ from pathlib import Path
 csv_path = Path(__file__).parent / "data" / "data_quality_results.csv"
 
 try:
-    if os.getenv("DATATRUST_DATA_SOURCE") == "csv":
+    if os.getenv("DATATRUST_DATA_SOURCE", "csv") == "csv":
         # Streamlit Cloud: use exported validation results
         df = pd.read_csv(csv_path)
 
